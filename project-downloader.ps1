@@ -9,7 +9,7 @@
 #        UrlPattern   = 'REGEX OF URL'
 #        IdExtractor  = { param($url)
 #            if ($url -match 'REGEX to extract Project ID') {
-#                return [string]$Matches
+#                return [string]$Matches[2]
 #            }
 #        }
 #        AssetBaseUrl = { param($id) return "Base asset URL" }
@@ -25,7 +25,7 @@ $WEBSITE_CONFIG = @{
         UrlPattern   = 'html-classic\.itch\.(zone|io)'
         IdExtractor  = { param($url)
             if ($url -match 'html-classic\.itch\.(zone|io)/html/(\d+)') {
-                return [string]$Matches
+                return [string]$Matches[2]
             }
         }
         AssetBaseUrl = { param($id) return "https://html-classic.itch.zone/html/$id/assets" }
@@ -38,10 +38,10 @@ $WEBSITE_CONFIG = @{
         UrlPattern   = 'scratch\.mit\.edu/projects/\d+|turbowarp\.org/\d+'
         IdExtractor = { param($url)
             if ($url -match 'scratch\.mit\.edu/projects/(\d+)') {
-                return $Matches
+                return $Matches[1]
             }
             if ($url -match 'turbowarp\.org/(\d+)') {
-                return $Matches
+                return $Matches[1]
             }
         }
         AssetBaseUrl = { param($id) return "https://assets.scratch.mit.edu/internalapi/asset" }
