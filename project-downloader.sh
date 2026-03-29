@@ -288,11 +288,29 @@ if [[ -z "$SITE_ID" ]]; then
             echo "$PAGE_HTML" > "$SAVE_PATH"
 
             write_green "✓ Saved to: $SAVE_PATH"
-            write_yellow "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            write_yellow "  This HTML file was downloaded from an unrecognized source."
-            write_yellow "  To unpack this project, upload the saved HTML file to:"
-            write_green  "  https://turbowarp.github.io/unpackager/"
-            write_yellow "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+            OUTPUT_SB3="${SAVE_PATH%.html}.sb3"
+
+            write_blue "\n→ Unpacking project locally..."
+
+            if command -v node >/dev/null 2>&1; then
+                if node unpackager-cli.js "$SAVE_PATH" "$OUTPUT_SB3"; then
+                    if [[ -f "$OUTPUT_SB3" ]]; then
+                        write_green "✓ Unpacked successfully: $OUTPUT_SB3"
+                    else
+                        write_red "✗ Unpack failed (no output file)"
+                    fi
+                else
+                    write_red "✗ Unpackager failed"
+                    write_yellow "Fallback:"
+                    write_green "  https://turbowarp.github.io/unpackager/"
+                fi
+            else
+                write_red "✗ Node.js not found"
+                write_yellow "Fallback:"
+                write_green "  https://turbowarp.github.io/unpackager/"
+            fi
+        fi
 
         elif echo "$PAGE_HTML" | grep -q 'assets/project\.json'; then
             # Type B: project.json + assets relative to the page URL
@@ -431,12 +449,32 @@ if echo "$PAGE_HTML" | grep -q '<script data='; then
 
     write_green "✓ Saved to: $SAVE_PATH"
 
-    if [[ -n "${!unpackager_var}" ]]; then
-        write_yellow "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        write_yellow "  To unpack this project, upload the saved HTML file to:"
-        write_green  "  ${!unpackager_var}"
-        write_yellow "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    OUTPUT_SB3="${SAVE_PATH%.html}.sb3"
+
+    write_blue "\n→ Unpacking project locally..."
+
+    if command -v node >/dev/null 2>&1; then
+        if node unpackager-cli.js "$SAVE_PATH" "$OUTPUT_SB3"; then
+            if [[ -f "$OUTPUT_SB3" ]]; then
+                write_green "✓ Unpacked successfully: $OUTPUT_SB3"
+            else
+                write_red "✗ Unpack failed (no output file)"
+            fi
+        else
+            write_red "✗ Unpackager failed"
+            if [[ -n "${!unpackager_var}" ]]; then
+                write_yellow "Fallback:"
+                write_green "  ${!unpackager_var}"
+            fi
+        fi
+    else
+        write_red "✗ Node.js not found"
+        if [[ -n "${!unpackager_var}" ]]; then
+            write_yellow "Fallback:"
+            write_green "  ${!unpackager_var}"
+        fi
     fi
+fi
 
 elif [[ "${!method_var}" == "scratch_api" ]]; then
     write_blue "\n→ Scratch API project detected."
