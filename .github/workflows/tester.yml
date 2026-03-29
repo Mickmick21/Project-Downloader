@@ -43,7 +43,7 @@ jobs:
             expected_file: "html_classic_project_15895585/project.json"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: sudo apt-get install -y python3 curl zip
