@@ -141,6 +141,11 @@ for target in data.get('targets', []):
         local url="https://assets.scratch.mit.edu/internalapi/asset/${md5ext}/get/"
         local filename="${assets_dir}/${md5ext}"
 
+        if [[ -f "$filename" ]]; then
+            echo "  Skipping: ${md5ext} (already exists)"
+            continue
+        fi
+
         echo -ne "  Downloading: ${md5ext} ... "
         if curl -s -f -o "$filename" "$url"; then
             write_green "✓"
@@ -173,6 +178,11 @@ for target in data.get('targets', []):
         local url="${base_url}/${md5ext}"
         local filename="${assets_dir}/${md5ext}"
 
+        if [[ -f "$filename" ]]; then
+            echo "  Skipping: ${md5ext} (already exists)"
+            continue
+        fi
+
         echo -ne "  Downloading: ${md5ext} ... "
         if curl -s -f -o "$filename" "$url"; then
             write_green "✓"
@@ -204,6 +214,11 @@ for font in data.get('customFonts', []):
         found=1
         local url="${base_url}/${md5ext}"
         local filename="${assets_dir}/${md5ext}"
+
+        if [[ -f "$filename" ]]; then
+            echo "  Skipping: ${md5ext} (already exists)"
+            continue
+        fi
 
         echo -ne "  Downloading: ${md5ext} ... "
         if curl -s -f -o "$filename" "$url"; then

@@ -126,6 +126,11 @@ function Download-ScratchAssets {
             $url      = "https://assets.scratch.mit.edu/internalapi/asset/$md5ext/get/"
             $filename = Join-Path $AssetsDir $md5ext
 
+            if (Test-Path $filename) {
+                Write-Host "  Skipping: $md5ext (already exists)" -ForegroundColor DarkGray
+                continue
+            }
+
             Write-Host "  Downloading: $md5ext ... " -NoNewline
             try {
                 Invoke-WebRequest -Uri $url -OutFile $filename -UseBasicParsing -ErrorAction Stop
@@ -157,6 +162,11 @@ function Download-Assets {
 
             $url      = "$BaseUrl/$md5ext"
             $filename = Join-Path $AssetsDir $md5ext
+
+            if (Test-Path $filename) {
+                Write-Host "  Skipping: $md5ext (already exists)" -ForegroundColor DarkGray
+                continue
+            }
 
             Write-Host "  Downloading: $md5ext ... " -NoNewline
             try {
@@ -190,6 +200,11 @@ function Download-Fonts {
 
         $url      = "$BaseUrl/$md5ext"
         $filename = Join-Path $AssetsDir $md5ext
+        
+        if (Test-Path $filename) {
+            Write-Host "  Skipping: $md5ext (already exists)" -ForegroundColor DarkGray
+            continue
+        }        
 
         Write-Host "  Downloading: $md5ext ... " -NoNewline
         try {
