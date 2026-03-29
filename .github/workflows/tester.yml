@@ -3,8 +3,14 @@ name: Test Project Downloader Scripts
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - "project-downloader.sh"
+      - "project-downloader.ps1"
   pull_request:
     branches: [ "main" ]
+    paths:
+      - "project-downloader.sh"
+      - "project-downloader.ps1"
   workflow_dispatch:
 
 jobs:
@@ -22,14 +28,15 @@ jobs:
         include:
           - name: Embedded project
             url: "https://html-classic.itch.zone/html/16920701/index.html?v=1774380047"
-            # Type A: script saves the HTML file and exits — no further prompts
+            # Type A: script saves the HTML file and exits.
             input: |
               https://html-classic.itch.zone/html/16920701/index.html?v=1774380047
             expected_file: "project_embedded_16920701.html"
 
           - name: External project.json
             url: "https://html-classic.itch.zone/html/15895585/index.html"
-            # Type B: after asset download the script asks "create sb3? (y/n)" — answer n
+            # Type B: after asset download the script asks "create sb3? (y/n)".
+            # Answer n
             input: |
               https://html-classic.itch.zone/html/15895585/index.html
               n
@@ -47,25 +54,25 @@ jobs:
       - name: Verify expected output – ${{ matrix.name }}
         run: |
           if [ ! -e "${{ matrix.expected_file }}" ]; then
-            echo "❌ Expected file not found: ${{ matrix.expected_file }}"
+            echo "✗ Expected file not found: ${{ matrix.expected_file }}"
             exit 1
           fi
-          echo "✅ Found: ${{ matrix.expected_file }}"
+          echo "✓ Found: ${{ matrix.expected_file }}"
 
       - name: Verify assets directory is non-empty (external project only)
         if: matrix.name == 'External project.json'
         run: |
           ASSETS_DIR="html_classic_project_15895585/assets"
           if [ ! -d "$ASSETS_DIR" ]; then
-            echo "❌ Assets directory not found: $ASSETS_DIR"
+            echo "✗ Assets directory not found: $ASSETS_DIR"
             exit 1
           fi
           COUNT=$(find "$ASSETS_DIR" -type f | wc -l)
           if [ "$COUNT" -eq 0 ]; then
-            echo "❌ Assets directory is empty"
+            echo "✗ Assets directory is empty"
             exit 1
           fi
-          echo "✅ Downloaded $COUNT asset(s) into $ASSETS_DIR"
+          echo "✓ Downloaded $COUNT asset(s) into $ASSETS_DIR"
 
       - name: Verify embedded HTML is non-empty (embedded project only)
         if: matrix.name == 'Embedded project'
@@ -73,10 +80,10 @@ jobs:
           FILE="project_embedded_16920701.html"
           SIZE=$(wc -c < "$FILE")
           if [ "$SIZE" -lt 1000 ]; then
-            echo "❌ Embedded HTML looks too small ($SIZE bytes) — download may have failed"
+            echo "✗ Embedded HTML looks too small ($SIZE bytes) — download may have failed"
             exit 1
           fi
-          echo "✅ Embedded HTML is $SIZE bytes"
+          echo "✓ Embedded HTML is $SIZE bytes"
 
   # ===========================================================================
   # PowerShell script tests (Windows)
@@ -118,10 +125,10 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Test-Path '${{ matrix.expected_file }}')) {
-            Write-Error "❌ Expected file not found: ${{ matrix.expected_file }}"
+            Write-Error "✗ Expected file not found: ${{ matrix.expected_file }}"
             exit 1
           }
-          Write-Host "✅ Found: ${{ matrix.expected_file }}"
+          Write-Host "✓ Found: ${{ matrix.expected_file }}"
 
       - name: Verify assets directory is non-empty (external project only)
         if: matrix.name == 'External project.json'
@@ -129,15 +136,15 @@ jobs:
         run: |
           $assetsDir = "html-classic_project_15895585\assets"
           if (-not (Test-Path $assetsDir)) {
-            Write-Error "❌ Assets directory not found: $assetsDir"
+            Write-Error "✗ Assets directory not found: $assetsDir"
             exit 1
           }
           $count = (Get-ChildItem $assetsDir -File).Count
           if ($count -eq 0) {
-            Write-Error "❌ Assets directory is empty"
+            Write-Error "✗ Assets directory is empty"
             exit 1
           }
-          Write-Host "✅ Downloaded $count asset(s) into $assetsDir"
+          Write-Host "✓ Downloaded $count asset(s) into $assetsDir"
 
       - name: Verify embedded HTML is non-empty (embedded project only)
         if: matrix.name == 'Embedded project'
@@ -146,7 +153,7 @@ jobs:
           $file = "project_embedded_16920701.html"
           $size = (Get-Item $file).Length
           if ($size -lt 1000) {
-            Write-Error "❌ Embedded HTML looks too small ($size bytes) — download may have failed"
+            Write-Error "✗ Embedded HTML looks too small ($size bytes) - download may have failed"
             exit 1
           }
-          Write-Host "✅ Embedded HTML is $size bytes"
+          Write-Host "✓ Embedded HTML is $size bytes"
