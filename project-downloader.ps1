@@ -30,7 +30,7 @@ $WEBSITE_CONFIG = @{
         }
         AssetBaseUrl = { param($id) return "https://html-classic.itch.zone/html/$id/assets" }
         Method       = "embedded_or_json"
-        Unpackager   = "https://turbowarp.github.io/unpackager/"
+        Unpackager   = ""
     }
     "scratch" = @{
         Aliases      = @("scratch.mit.edu", "turbowarp.org")
@@ -280,11 +280,26 @@ if ($null -eq $websiteInfo) {
             $PAGE_HTML | Out-File -FilePath $SAVE_PATH -Encoding UTF8
 
             Write-Green "✓ Saved to: $SAVE_PATH"
-            Write-Yellow "`n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            Write-Yellow "  This HTML file was downloaded from an unrecognized source."
-            Write-Yellow "  To unpack this project, upload the saved HTML file to:"
-            Write-Green  "  https://turbowarp.github.io/unpackager/"
-            Write-Yellow "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n"
+
+            $OUTPUT_SB3 = $SAVE_PATH -replace '\.html$', '.sb3'
+
+            Write-Blue "`n→ Unpacking project locally..."
+
+            try {
+                $process = Start-Process -FilePath "node" `
+                    -ArgumentList "unpackager-cli.js `"$SAVE_PATH`" `"$OUTPUT_SB3`"" `
+                    -NoNewWindow -Wait -PassThru
+
+                if ($process.ExitCode -eq 0 -and (Test-Path $OUTPUT_SB3)) {
+                    Write-Green "✓ Unpacked successfully: $OUTPUT_SB3"
+                } else {
+                    Write-Red "✗ Unpackager failed (exit code $($process.ExitCode))"
+                    Write-Yellow "You can still manually upload: https://turbowarp.github.io/unpackager/"
+                }
+            } catch {
+                Write-Red "✗ Failed to run Node.js: $_"
+                Write-Yellow "Make sure Node.js is installed."
+            }
 
         } elseif ($PAGE_HTML -match 'assets/project\.json') {
             # Type B: project.json + assets relative to the page URL
@@ -431,11 +446,26 @@ if ($PAGE_HTML -match '<script data=') {
 
     Write-Green "✓ Saved to: $SAVE_PATH"
 
-    if ($siteConfig.Unpackager) {
-        Write-Yellow "`n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        Write-Yellow "  To unpack this project, upload the saved HTML file to:"
-        Write-Green  "  $($siteConfig.Unpackager)"
-        Write-Yellow "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n"
+    $OUTPUT_SB3 = $SAVE_PATH -replace '\.html$', '.sb3'
+
+    Write-Blue "`n→ Unpacking project locally..."
+
+    try {
+        $process = Start-Process -FilePath "node" `
+            -ArgumentList "unpackager-cli.js `"$SAVE_PATH`" `"$OUTPUT_SB3`"" `
+            -NoNewWindow -Wait -PassThru
+
+        if ($process.ExitCode -eq 0 -and (Test-Path $OUTPUT_SB3)) {
+            Write-Green "✓ Unpacked successfully: $OUTPUT_SB3"
+        } else {
+            Write-Red "✗ Unpackager failed"
+            if ($siteConfig.Unpackager) {
+                Write-Yellow "Fallback:"
+                Write-Green "  $($siteConfig.Unpackager)"
+            }
+        }
+    } catch {
+        Write-Red "✗ Failed to run Node.js: $_"
     }
 
 } elseif ($PAGE_HTML -match 'assets/project\.json') {
