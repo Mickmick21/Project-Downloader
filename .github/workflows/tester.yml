@@ -1,0 +1,152 @@
+name: Test Project Downloader Scripts
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+
+  # ===========================================================================
+  # Bash script tests (Ubuntu)
+  # ===========================================================================
+  test-bash:
+    name: Bash – ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Embedded project
+            url: "https://html-classic.itch.zone/html/16920701/index.html?v=1774380047"
+            # Type A: script saves the HTML file and exits — no further prompts
+            input: |
+              https://html-classic.itch.zone/html/16920701/index.html?v=1774380047
+            expected_file: "project_embedded_16920701.html"
+
+          - name: External project.json
+            url: "https://html-classic.itch.zone/html/15895585/index.html"
+            # Type B: after asset download the script asks "create sb3? (y/n)" — answer n
+            input: |
+              https://html-classic.itch.zone/html/15895585/index.html
+              n
+            expected_file: "html_classic_project_15895585/project.json"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y python3 curl zip
+
+      - name: Run script – ${{ matrix.name }}
+        run: echo "${{ matrix.input }}" | bash project-downloader.sh
+
+      - name: Verify expected output – ${{ matrix.name }}
+        run: |
+          if [ ! -e "${{ matrix.expected_file }}" ]; then
+            echo "❌ Expected file not found: ${{ matrix.expected_file }}"
+            exit 1
+          fi
+          echo "✅ Found: ${{ matrix.expected_file }}"
+
+      - name: Verify assets directory is non-empty (external project only)
+        if: matrix.name == 'External project.json'
+        run: |
+          ASSETS_DIR="html_classic_project_15895585/assets"
+          if [ ! -d "$ASSETS_DIR" ]; then
+            echo "❌ Assets directory not found: $ASSETS_DIR"
+            exit 1
+          fi
+          COUNT=$(find "$ASSETS_DIR" -type f | wc -l)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "❌ Assets directory is empty"
+            exit 1
+          fi
+          echo "✅ Downloaded $COUNT asset(s) into $ASSETS_DIR"
+
+      - name: Verify embedded HTML is non-empty (embedded project only)
+        if: matrix.name == 'Embedded project'
+        run: |
+          FILE="project_embedded_16920701.html"
+          SIZE=$(wc -c < "$FILE")
+          if [ "$SIZE" -lt 1000 ]; then
+            echo "❌ Embedded HTML looks too small ($SIZE bytes) — download may have failed"
+            exit 1
+          fi
+          echo "✅ Embedded HTML is $SIZE bytes"
+
+  # ===========================================================================
+  # PowerShell script tests (Windows)
+  # ===========================================================================
+  test-powershell:
+    name: PowerShell – ${{ matrix.name }}
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Embedded project
+            url: "https://html-classic.itch.zone/html/16920701/index.html?v=1774380047"
+            expected_file: "project_embedded_16920701.html"
+
+          - name: External project.json
+            url: "https://html-classic.itch.zone/html/15895585/index.html"
+            expected_file: "html-classic_project_15895585\\project.json"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run script – ${{ matrix.name }} (embedded, no extra prompt)
+        if: matrix.name == 'Embedded project'
+        shell: pwsh
+        run: |
+          # Pipe URL; embedded path exits before asking about sb3
+          '${{ matrix.url }}' | pwsh -File project-downloader.ps1
+
+      - name: Run script – ${{ matrix.name }} (external, answer n to sb3 prompt)
+        if: matrix.name == 'External project.json'
+        shell: pwsh
+        run: |
+          # Pipe URL then 'n' to decline sb3 creation
+          '${{ matrix.url }}', 'n' | pwsh -File project-downloader.ps1
+
+      - name: Verify expected output – ${{ matrix.name }}
+        shell: pwsh
+        run: |
+          if (-not (Test-Path '${{ matrix.expected_file }}')) {
+            Write-Error "❌ Expected file not found: ${{ matrix.expected_file }}"
+            exit 1
+          }
+          Write-Host "✅ Found: ${{ matrix.expected_file }}"
+
+      - name: Verify assets directory is non-empty (external project only)
+        if: matrix.name == 'External project.json'
+        shell: pwsh
+        run: |
+          $assetsDir = "html-classic_project_15895585\assets"
+          if (-not (Test-Path $assetsDir)) {
+            Write-Error "❌ Assets directory not found: $assetsDir"
+            exit 1
+          }
+          $count = (Get-ChildItem $assetsDir -File).Count
+          if ($count -eq 0) {
+            Write-Error "❌ Assets directory is empty"
+            exit 1
+          }
+          Write-Host "✅ Downloaded $count asset(s) into $assetsDir"
+
+      - name: Verify embedded HTML is non-empty (embedded project only)
+        if: matrix.name == 'Embedded project'
+        shell: pwsh
+        run: |
+          $file = "project_embedded_16920701.html"
+          $size = (Get-Item $file).Length
+          if ($size -lt 1000) {
+            Write-Error "❌ Embedded HTML looks too small ($size bytes) — download may have failed"
+            exit 1
+          }
+          Write-Host "✅ Embedded HTML is $size bytes"
