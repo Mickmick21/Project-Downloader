@@ -182,6 +182,40 @@ for target in data.get('targets', []):
     done <<< "$md5exts"
 }
 
+download_fonts() {
+    local json_file="$1"
+    local base_url="$2"
+    local assets_dir="$3"
+
+    local md5exts
+    md5exts=$(python3 -c "
+import json, sys
+with open('$json_file') as f:
+    data = json.load(f)
+for font in data.get('customFonts', []):
+    ext = font.get('md5ext', '')
+    if ext:
+        print(ext)
+")
+
+    local found=0
+    while IFS= read -r md5ext; do
+        [[ -z "$md5ext" ]] && continue
+        found=1
+        local url="${base_url}/${md5ext}"
+        local filename="${assets_dir}/${md5ext}"
+
+        echo -ne "  Downloading: ${md5ext} ... "
+        if curl -s -f -o "$filename" "$url"; then
+            write_green "✓"
+        else
+            write_red "✗"
+        fi
+    done <<< "$md5exts"
+
+    [[ $found -eq 0 ]] && write_blue "  (no custom fonts)"
+}
+
 # --- Main Logic ---
 
 write_blue "=== Project Downloader ===\n"
@@ -278,6 +312,9 @@ if [[ -z "$SITE_ID" ]]; then
 
             write_blue "\nDownloading sounds..."
             download_assets "$JSON_FILE" "$ASSETS_BASE_URL" "$ASSETS_DIR" "sounds"
+
+            write_blue "\nDownloading fonts..."
+            download_fonts "$JSON_FILE" "$ASSETS_BASE_URL" "$ASSETS_DIR"
 
             write_green "\n✓ Asset download complete!\n"
 
@@ -480,6 +517,9 @@ elif echo "$PAGE_HTML" | grep -q 'assets/project\.json'; then
 
     write_blue "\nDownloading sounds..."
     download_assets "$JSON_FILE" "$ASSETS_BASE_URL" "$ASSETS_DIR" "sounds"
+
+    write_blue "\nDownloading fonts..."
+    download_fonts "$JSON_FILE" "$ASSETS_BASE_URL" "$ASSETS_DIR"
 
     write_green "\n✓ Asset download complete!\n"
 
