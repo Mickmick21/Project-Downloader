@@ -30,7 +30,7 @@ $WEBSITE_CONFIG = @{
         }
         AssetBaseUrl = { param($id) return "https://html-classic.itch.zone/html/$id/assets" }
         Method       = "embedded_or_json"
-        Unpackager   = "https://turbowarp.github.io/unpackager/" # Most of the time Turbowarp unpackager works.
+        Unpackager   = "https://turbowarp.github.io/unpackager/"
     }
     "scratch" = @{
         Aliases      = @("scratch.mit.edu", "turbowarp.org")
@@ -96,6 +96,16 @@ function Get-WebsiteConfig {
     return $null
 }
 
+function Is-ValidUrl {
+    param([string]$Url)
+    try {
+        $uri = [System.Uri]$Url
+        return $uri.Scheme -in @('http', 'https')
+    } catch {
+        return $false
+    }
+}
+
 function Download-ScratchAssets {
     param(
         [string]$JsonFile,
@@ -132,7 +142,7 @@ function Download-Assets {
         [string]$JsonFile,
         [string]$BaseUrl,
         [string]$AssetsDir,
-        [string]$AssetType   # "costumes" or "sounds"
+        [string]$AssetType
     )
 
     $json = Get-Content $JsonFile -Raw | ConvertFrom-Json -AsHashtable
@@ -183,12 +193,139 @@ if ([string]::IsNullOrWhiteSpace($INPUT_URL)) {
 $websiteInfo = Get-WebsiteConfig $INPUT_URL
 
 if ($null -eq $websiteInfo) {
-    Write-Red "✗ Unrecognized URL format."
-    Write-Yellow "Supported websites:"
-    foreach ($site in $WEBSITE_CONFIG.GetEnumerator()) {
-        Write-Yellow "  • $($site.Value.Aliases -join ', ')"
+    # Fallback: Try to use the URL as a direct HTML project
+    Write-Yellow "`n⚠ URL not found in website configuration."
+
+    if (Is-ValidUrl $INPUT_URL) {
+        Write-Yellow "Attempting to use URL as direct HTML project..."
+
+        $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0" }
+
+        try {
+            $PAGE_HTML = (Invoke-WebRequest -Uri $INPUT_URL -Headers $headers -UseBasicParsing -ErrorAction Stop).Content
+        } catch {
+            Write-Red "✗ Failed to fetch the page: $_"
+            Write-Yellow "`nSupported websites:"
+            foreach ($site in $WEBSITE_CONFIG.GetEnumerator()) {
+                Write-Yellow "  • $($site.Value.Aliases -join ', ')"
+            }
+            exit 1
+        }
+
+        if ([string]::IsNullOrWhiteSpace($PAGE_HTML)) {
+            Write-Red "✗ Failed to fetch the page (empty response)."
+            exit 1
+        }
+
+        Write-Green "✓ Successfully fetched HTML from URL"
+
+        # Generate a short hash from the URL for filenames
+        $urlHashBytes = [System.Security.Cryptography.MD5]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($INPUT_URL))
+        $urlHash = ($urlHashBytes | ForEach-Object { $_.ToString("x2") }) -join ""
+        $urlHash = $urlHash.Substring(0, 8)
+
+        if ($PAGE_HTML -match '<script data=') {
+            # Type A: project data embedded in HTML
+            Write-Yellow "`n→ Detected embedded project (data inside HTML)."
+            Write-Blue "  Saving HTML file..."
+
+            $SAVE_PATH = Join-Path (Get-Location) "project_fallback_$urlHash.html"
+            $PAGE_HTML | Out-File -FilePath $SAVE_PATH -Encoding UTF8
+
+            Write-Green "✓ Saved to: $SAVE_PATH"
+            Write-Yellow "`n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            Write-Yellow "  This HTML file was downloaded from an unrecognized source."
+            Write-Yellow "  To unpack this project, upload the saved HTML file to:"
+            Write-Green  "  https://turbowarp.github.io/unpackager/"
+            Write-Yellow "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n"
+
+        } elseif ($PAGE_HTML -match 'assets/project\.json') {
+            # Type B: project.json + assets relative to the page URL
+            Write-Blue "`n→ Detected downloadable project (project.json + assets)."
+
+            # Derive asset base URL from the page URL (strip filename, append assets/)
+            $pageBaseUrl = $INPUT_URL.Substring(0, $INPUT_URL.LastIndexOf('/'))
+            $ASSETS_BASE_URL = "$pageBaseUrl/assets"
+            $PROJECT_JSON_URL = "$ASSETS_BASE_URL/project.json"
+
+            Write-Blue "  Assets URL : $ASSETS_BASE_URL"
+
+            $WORK_DIR = Join-Path (Get-Location) "project_fallback_$urlHash"
+            New-Item -ItemType Directory -Path $WORK_DIR -Force | Out-Null
+
+            $JSON_FILE = Join-Path $WORK_DIR "project.json"
+            Write-Blue "`n→ Downloading project.json..."
+
+            try {
+                Invoke-WebRequest -Uri $PROJECT_JSON_URL -OutFile $JSON_FILE -UseBasicParsing -ErrorAction Stop
+            } catch {
+                Write-Red "✗ Failed to download project.json: $_"
+                exit 1
+            }
+
+            if (-not (Validate-File $JSON_FILE)) { exit 1 }
+            Write-Green "✓ project.json downloaded"
+
+            $ASSETS_DIR = Join-Path $WORK_DIR "assets"
+            New-Item -ItemType Directory -Path $ASSETS_DIR -Force | Out-Null
+
+            Write-Blue "`nDownloading costumes..."
+            Download-Assets -JsonFile $JSON_FILE -BaseUrl $ASSETS_BASE_URL -AssetsDir $ASSETS_DIR -AssetType "costumes"
+
+            Write-Blue "`nDownloading sounds..."
+            Download-Assets -JsonFile $JSON_FILE -BaseUrl $ASSETS_BASE_URL -AssetsDir $ASSETS_DIR -AssetType "sounds"
+
+            Write-Green "`n✓ Asset download complete!`n"
+
+            Write-Host "Do you want to create an .sb3 file? (y/n): " -ForegroundColor Cyan -NoNewline
+            $create_zip = Read-Host
+
+            if ($create_zip -match '^[Yy]$') {
+                $ZIP_FILENAME = Prompt-Input "Enter sb3 filename" "project_$urlHash.sb3"
+
+                if ($ZIP_FILENAME -notmatch '\.') {
+                    $ZIP_FILENAME = "$ZIP_FILENAME.sb3"
+                    Write-Blue "No extension provided, using: $ZIP_FILENAME"
+                }
+
+                Write-Blue "`nCreating sb3 file..."
+
+                $TEMP_ZIP_DIR = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
+                New-Item -ItemType Directory -Path $TEMP_ZIP_DIR -Force | Out-Null
+
+                try {
+                    Copy-Item $JSON_FILE (Join-Path $TEMP_ZIP_DIR "project.json")
+                    foreach ($f in (Get-ChildItem $ASSETS_DIR -File -ErrorAction SilentlyContinue)) {
+                        Copy-Item $f.FullName (Join-Path $TEMP_ZIP_DIR $f.Name)
+                    }
+                    $OUTPUT_ZIP = Join-Path (Get-Location) $ZIP_FILENAME
+                    Compress-Archive -Path "$TEMP_ZIP_DIR\*" -DestinationPath $OUTPUT_ZIP -Force
+                    $zip_size = "{0:N2} MB" -f ((Get-Item $OUTPUT_ZIP).Length / 1MB)
+                    Write-Green "✓ SB3 created: $OUTPUT_ZIP ($zip_size)"
+                } catch {
+                    Write-Red "✗ Failed to create sb3 file: $_"
+                } finally {
+                    Remove-Item $TEMP_ZIP_DIR -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
+
+        } else {
+            Write-Red "✗ Could not determine project type from the page."
+            Write-Yellow "  The page may use an unsupported packaging format."
+            exit 1
+        }
+
+        Write-Green "`nDone!"
+        exit 0
+
+    } else {
+        Write-Red "✗ Invalid URL format."
+        Write-Yellow "Supported websites:"
+        foreach ($site in $WEBSITE_CONFIG.GetEnumerator()) {
+            Write-Yellow "  • $($site.Value.Aliases -join ', ')"
+        }
+        exit 1
     }
-    exit 1
 }
 
 $siteName = $websiteInfo.Name
@@ -369,7 +506,6 @@ if ($PAGE_HTML -match '<script data=') {
 
     Write-Green "`n✓ Asset download complete!`n"
 
-    # SB3 creation block (same as the existing one — paste it here)
     Write-Host "Do you want to create an .sb3 file? (y/n): " -ForegroundColor Cyan -NoNewline
     $create_zip = Read-Host
     if ($create_zip -match '^[Yy]$') {

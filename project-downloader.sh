@@ -206,13 +206,129 @@ fi
 SITE_ID=$(get_site_id "$INPUT_URL")
 
 if [[ -z "$SITE_ID" ]]; then
-    write_red "✗ Unrecognized URL format."
-    write_yellow "Supported websites:"
-    for site_id in "${SITES[@]}"; do
-        aliases_var="SITE_${site_id}_ALIASES"
-        write_yellow "  • ${!aliases_var}"
-    done
-    exit 1
+    write_yellow "\n⚠ URL not found in website configuration."
+
+    # Validate that it at least looks like an http(s) URL
+    if [[ "$INPUT_URL" =~ ^https?:// ]]; then
+        write_yellow "Attempting to use URL as direct HTML project..."
+
+        PAGE_HTML=$(curl -s -f -L \
+            -A "Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0" \
+            "$INPUT_URL")
+
+        if [[ $? -ne 0 || -z "$PAGE_HTML" ]]; then
+            write_red "✗ Failed to fetch the page."
+            write_yellow "\nSupported websites:"
+            for site_id in "${SITES[@]}"; do
+                aliases_var="SITE_${site_id}_ALIASES"
+                write_yellow "  • ${!aliases_var}"
+            done
+            exit 1
+        fi
+
+        write_green "✓ Successfully fetched HTML from URL"
+
+        URL_HASH=$(echo -n "$INPUT_URL" | md5sum | cut -c1-8)
+
+        if echo "$PAGE_HTML" | grep -q '<script data='; then
+            # Type A: project data embedded in HTML
+            write_yellow "\n→ Detected embedded project (data inside HTML)."
+            write_blue "  Saving HTML file..."
+
+            SAVE_PATH="$(pwd)/project_fallback_${URL_HASH}.html"
+            echo "$PAGE_HTML" > "$SAVE_PATH"
+
+            write_green "✓ Saved to: $SAVE_PATH"
+            write_yellow "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            write_yellow "  This HTML file was downloaded from an unrecognized source."
+            write_yellow "  To unpack this project, upload the saved HTML file to:"
+            write_green  "  https://turbowarp.github.io/unpackager/"
+            write_yellow "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+        elif echo "$PAGE_HTML" | grep -q 'assets/project\.json'; then
+            # Type B: project.json + assets relative to the page URL
+            write_blue "\n→ Detected downloadable project (project.json + assets)."
+
+            # Derive asset base URL from the page URL (strip filename, append assets/)
+            PAGE_BASE_URL="${INPUT_URL%/*}"
+            ASSETS_BASE_URL="${PAGE_BASE_URL}/assets"
+            PROJECT_JSON_URL="${ASSETS_BASE_URL}/project.json"
+
+            write_blue "  Assets URL : $ASSETS_BASE_URL"
+
+            WORK_DIR="$(pwd)/project_fallback_${URL_HASH}"
+            mkdir -p "$WORK_DIR"
+
+            JSON_FILE="${WORK_DIR}/project.json"
+            write_blue "\n→ Downloading project.json..."
+
+            if ! curl -s -f -o "$JSON_FILE" "$PROJECT_JSON_URL"; then
+                write_red "✗ Failed to download project.json"
+                exit 1
+            fi
+
+            validate_file "$JSON_FILE" || exit 1
+            write_green "✓ project.json downloaded"
+
+            ASSETS_DIR="${WORK_DIR}/assets"
+            mkdir -p "$ASSETS_DIR"
+
+            write_blue "\nDownloading costumes..."
+            download_assets "$JSON_FILE" "$ASSETS_BASE_URL" "$ASSETS_DIR" "costumes"
+
+            write_blue "\nDownloading sounds..."
+            download_assets "$JSON_FILE" "$ASSETS_BASE_URL" "$ASSETS_DIR" "sounds"
+
+            write_green "\n✓ Asset download complete!\n"
+
+            echo -ne "${CYAN}Do you want to create an .sb3 file? (y/n): ${NC}"
+            read create_zip
+
+            if [[ "$create_zip" =~ ^[Yy]$ ]]; then
+                ZIP_FILENAME=$(prompt_input "Enter sb3 filename" "project_${URL_HASH}.sb3")
+
+                if [[ "$ZIP_FILENAME" != *.* ]]; then
+                    ZIP_FILENAME="${ZIP_FILENAME}.sb3"
+                    write_blue "No extension provided, using: $ZIP_FILENAME"
+                fi
+
+                write_blue "\nCreating sb3 file..."
+
+                TEMP_ZIP_DIR=$(mktemp -d)
+                trap "rm -rf $TEMP_ZIP_DIR" EXIT
+
+                cp "$JSON_FILE" "${TEMP_ZIP_DIR}/project.json"
+                for f in "$ASSETS_DIR"/*; do
+                    [[ -f "$f" ]] && cp "$f" "$TEMP_ZIP_DIR/"
+                done
+
+                OUTPUT_ZIP="$(pwd)/${ZIP_FILENAME}"
+
+                if (cd "$TEMP_ZIP_DIR" && zip -r "$OUTPUT_ZIP" .); then
+                    ZIP_SIZE=$(du -sh "$OUTPUT_ZIP" | cut -f1)
+                    write_green "✓ SB3 created: $OUTPUT_ZIP ($ZIP_SIZE)"
+                else
+                    write_red "✗ Failed to create sb3 file"
+                fi
+            fi
+
+        else
+            write_red "✗ Could not determine project type from the page."
+            write_yellow "  The page may use an unsupported packaging format."
+            exit 1
+        fi
+
+        write_green "\nDone!"
+        exit 0
+    else
+        write_red "✗ Invalid URL format."
+        write_yellow "Supported websites:"
+        for site_id in "${SITES[@]}"; do
+            aliases_var="SITE_${site_id}_ALIASES"
+            write_yellow "  • ${!aliases_var}"
+        done
+        exit 1
+    fi
 fi
 
 aliases_var="SITE_${SITE_ID}_ALIASES"
