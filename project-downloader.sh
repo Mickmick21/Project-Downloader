@@ -310,7 +310,7 @@ if [[ -z "$SITE_ID" ]]; then
                 write_yellow "Fallback:"
                 write_green "  https://turbowarp.github.io/unpackager/"
             fi
-        fi
+        
 
         elif echo "$PAGE_HTML" | grep -q 'assets/project\.json'; then
             # Type B: project.json + assets relative to the page URL
@@ -474,7 +474,6 @@ if echo "$PAGE_HTML" | grep -q '<script data='; then
             write_green "  ${!unpackager_var}"
         fi
     fi
-fi
 
 elif [[ "${!method_var}" == "scratch_api" ]]; then
     write_blue "\n→ Scratch API project detected."

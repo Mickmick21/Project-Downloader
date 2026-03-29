@@ -281,7 +281,6 @@ if ($null -eq $websiteInfo) {
 
             Write-Green "✓ Saved to: $SAVE_PATH"
 
-            # --- NEW: run unpackager ---
             $OUTPUT_SB3 = $SAVE_PATH -replace '\.html$', '.sb3'
 
             Write-Blue "`n→ Unpacking project locally..."
@@ -301,7 +300,6 @@ if ($null -eq $websiteInfo) {
                 Write-Red "✗ Failed to run Node.js: $_"
                 Write-Yellow "Make sure Node.js is installed."
             }
-        }
 
         } elseif ($PAGE_HTML -match 'assets/project\.json') {
             # Type B: project.json + assets relative to the page URL
