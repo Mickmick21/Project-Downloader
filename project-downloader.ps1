@@ -169,6 +169,38 @@ function Download-Assets {
     }
 }
 
+function Download-Fonts {
+    param(
+        [string]$JsonFile,
+        [string]$BaseUrl,
+        [string]$AssetsDir
+    )
+
+    $json = Get-Content $JsonFile -Raw | ConvertFrom-Json -AsHashtable
+
+    $fonts = $json.customFonts
+    if ($null -eq $fonts -or $fonts.Count -eq 0) {
+        Write-Blue "  (no custom fonts)"
+        return
+    }
+
+    foreach ($font in $fonts) {
+        $md5ext = $font.md5ext
+        if ([string]::IsNullOrWhiteSpace($md5ext)) { continue }
+
+        $url      = "$BaseUrl/$md5ext"
+        $filename = Join-Path $AssetsDir $md5ext
+
+        Write-Host "  Downloading: $md5ext ... " -NoNewline
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $filename -UseBasicParsing -ErrorAction Stop
+            Write-Green "✓"
+        } catch {
+            Write-Red "✗"
+        }
+    }
+}
+
 # --- Main Logic ---
 
 Write-Blue "=== Project Downloader ===`n"
@@ -274,6 +306,9 @@ if ($null -eq $websiteInfo) {
 
             Write-Blue "`nDownloading sounds..."
             Download-Assets -JsonFile $JSON_FILE -BaseUrl $ASSETS_BASE_URL -AssetsDir $ASSETS_DIR -AssetType "sounds"
+
+            Write-Blue "`nDownloading fonts..."
+            Download-Fonts -JsonFile $JSON_FILE -BaseUrl $ASSETS_BASE_URL -AssetsDir $ASSETS_DIR
 
             Write-Green "`n✓ Asset download complete!`n"
 
@@ -424,6 +459,9 @@ if ($PAGE_HTML -match '<script data=') {
 
     Write-Blue "`nDownloading sounds..."
     Download-Assets -JsonFile $JSON_FILE -BaseUrl $ASSETS_BASE_URL -AssetsDir $ASSETS_DIR -AssetType "sounds"
+
+    Write-Blue "`nDownloading fonts..."
+    Download-Fonts -JsonFile $JSON_FILE -BaseUrl $ASSETS_BASE_URL -AssetsDir $ASSETS_DIR
 
     Write-Green "`n✓ Asset download complete!`n"
 
