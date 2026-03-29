@@ -108,7 +108,7 @@ jobs:
             expected_file: "html-classic_project_15895585\\project.json"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run script – ${{ matrix.name }} (embedded, no extra prompt)
         if: matrix.name == 'Embedded project'
