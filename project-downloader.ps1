@@ -32,11 +32,11 @@ $WEBSITE_CONFIG = @{
         Method       = "embedded_or_json"
         Unpackager   = ""
     }
-    "scratch" = @{
+    "scratch"      = @{
         Aliases      = @("scratch.mit.edu", "turbowarp.org")
         Reason       = "Supported"
         UrlPattern   = 'scratch\.mit\.edu/projects/\d+|turbowarp\.org/\d+'
-        IdExtractor = { param($url)
+        IdExtractor  = { param($url)
             if ($url -match 'scratch\.mit\.edu/projects/(\d+)') {
                 return $Matches[1]
             }
@@ -52,9 +52,9 @@ $WEBSITE_CONFIG = @{
 
 # --- Colors via Write-Host ---
 
-function Write-Green  { param($msg) Write-Host $msg -ForegroundColor Green }
-function Write-Blue   { param($msg) Write-Host $msg -ForegroundColor Cyan }
-function Write-Red    { param($msg) Write-Host $msg -ForegroundColor Red }
+function Write-Green { param($msg) Write-Host $msg -ForegroundColor Green }
+function Write-Blue { param($msg) Write-Host $msg -ForegroundColor Cyan }
+function Write-Red { param($msg) Write-Host $msg -ForegroundColor Red }
 function Write-Yellow { param($msg) Write-Host $msg -ForegroundColor Yellow }
 
 # --- Helper Functions ---
@@ -70,7 +70,8 @@ function Prompt-Input {
         $userInput = Read-Host
         if ([string]::IsNullOrWhiteSpace($userInput)) { return $DefaultValue }
         return $userInput
-    } else {
+    }
+    else {
         Write-Host "${PromptText}: " -ForegroundColor Cyan -NoNewline
         return Read-Host
     }
@@ -101,7 +102,8 @@ function Is-ValidUrl {
     try {
         $uri = [System.Uri]$Url
         return $uri.Scheme -in @('http', 'https')
-    } catch {
+    }
+    catch {
         return $false
     }
 }
@@ -123,7 +125,7 @@ function Download-ScratchAssets {
             $md5ext = $asset.md5ext
             if ([string]::IsNullOrWhiteSpace($md5ext)) { continue }
 
-            $url      = "https://assets.scratch.mit.edu/internalapi/asset/$md5ext/get/"
+            $url = "https://assets.scratch.mit.edu/internalapi/asset/$md5ext/get/"
             $filename = Join-Path $AssetsDir $md5ext
 
             if (Test-Path $filename) {
@@ -135,7 +137,8 @@ function Download-ScratchAssets {
             try {
                 Invoke-WebRequest -Uri $url -OutFile $filename -UseBasicParsing -ErrorAction Stop
                 Write-Green "✓"
-            } catch {
+            }
+            catch {
                 Write-Red "✗"
             }
         }
@@ -160,7 +163,7 @@ function Download-Assets {
             $md5ext = $asset.md5ext
             if ([string]::IsNullOrWhiteSpace($md5ext)) { continue }
 
-            $url      = "$BaseUrl/$md5ext"
+            $url = "$BaseUrl/$md5ext"
             $filename = Join-Path $AssetsDir $md5ext
 
             if (Test-Path $filename) {
@@ -172,7 +175,8 @@ function Download-Assets {
             try {
                 Invoke-WebRequest -Uri $url -OutFile $filename -UseBasicParsing -ErrorAction Stop
                 Write-Green "✓"
-            } catch {
+            }
+            catch {
                 Write-Red "✗"
             }
         }
@@ -198,19 +202,20 @@ function Download-Fonts {
         $md5ext = $font.md5ext
         if ([string]::IsNullOrWhiteSpace($md5ext)) { continue }
 
-        $url      = "$BaseUrl/$md5ext"
+        $url = "$BaseUrl/$md5ext"
         $filename = Join-Path $AssetsDir $md5ext
-        
+
         if (Test-Path $filename) {
             Write-Host "  Skipping: $md5ext (already exists)" -ForegroundColor DarkGray
             continue
-        }        
+        }
 
         Write-Host "  Downloading: $md5ext ... " -NoNewline
         try {
             Invoke-WebRequest -Uri $url -OutFile $filename -UseBasicParsing -ErrorAction Stop
             Write-Green "✓"
-        } catch {
+        }
+        catch {
             Write-Red "✗"
         }
     }
@@ -250,7 +255,8 @@ if ($null -eq $websiteInfo) {
 
         try {
             $PAGE_HTML = (Invoke-WebRequest -Uri $INPUT_URL -Headers $headers -UseBasicParsing -ErrorAction Stop).Content
-        } catch {
+        }
+        catch {
             Write-Red "✗ Failed to fetch the page: $_"
             Write-Yellow "`nSupported websites:"
             foreach ($site in $WEBSITE_CONFIG.GetEnumerator()) {
@@ -292,16 +298,19 @@ if ($null -eq $websiteInfo) {
 
                 if ($process.ExitCode -eq 0 -and (Test-Path $OUTPUT_SB3)) {
                     Write-Green "✓ Unpacked successfully: $OUTPUT_SB3"
-                } else {
+                }
+                else {
                     Write-Red "✗ Unpackager failed (exit code $($process.ExitCode))"
                     Write-Yellow "You can still manually upload: https://turbowarp.github.io/unpackager/"
                 }
-            } catch {
+            }
+            catch {
                 Write-Red "✗ Failed to run Node.js: $_"
                 Write-Yellow "Make sure Node.js is installed."
             }
 
-        } elseif ($PAGE_HTML -match 'assets/project\.json') {
+        }
+        elseif ($PAGE_HTML -match 'assets/project\.json') {
             # Type B: project.json + assets relative to the page URL
             Write-Blue "`n→ Detected downloadable project (project.json + assets)."
 
@@ -320,7 +329,8 @@ if ($null -eq $websiteInfo) {
 
             try {
                 Invoke-WebRequest -Uri $PROJECT_JSON_URL -OutFile $JSON_FILE -UseBasicParsing -ErrorAction Stop
-            } catch {
+            }
+            catch {
                 Write-Red "✗ Failed to download project.json: $_"
                 exit 1
             }
@@ -367,14 +377,17 @@ if ($null -eq $websiteInfo) {
                     Compress-Archive -Path "$TEMP_ZIP_DIR\*" -DestinationPath $OUTPUT_ZIP -Force
                     $zip_size = "{0:N2} MB" -f ((Get-Item $OUTPUT_ZIP).Length / 1MB)
                     Write-Green "✓ SB3 created: $OUTPUT_ZIP ($zip_size)"
-                } catch {
+                }
+                catch {
                     Write-Red "✗ Failed to create sb3 file: $_"
-                } finally {
+                }
+                finally {
                     Remove-Item $TEMP_ZIP_DIR -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
 
-        } else {
+        }
+        else {
             Write-Red "✗ Could not determine project type from the page."
             Write-Yellow "  The page may use an unsupported packaging format."
             exit 1
@@ -383,7 +396,8 @@ if ($null -eq $websiteInfo) {
         Write-Green "`nDone!"
         exit 0
 
-    } else {
+    }
+    else {
         Write-Red "✗ Invalid URL format."
         Write-Yellow "Supported websites:"
         foreach ($site in $WEBSITE_CONFIG.GetEnumerator()) {
@@ -422,7 +436,8 @@ $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0
 
 try {
     $PAGE_HTML = (Invoke-WebRequest -Uri $INPUT_URL -Headers $headers -UseBasicParsing -ErrorAction Stop).Content
-} catch {
+}
+catch {
     Write-Red "✗ Failed to fetch the page: $_"
     exit 1
 }
@@ -457,22 +472,25 @@ if ($PAGE_HTML -match '<script data=') {
 
         if ($process.ExitCode -eq 0 -and (Test-Path $OUTPUT_SB3)) {
             Write-Green "✓ Unpacked successfully: $OUTPUT_SB3"
-        } else {
+        }
+        else {
             Write-Red "✗ Unpackager failed"
             if ($siteConfig.Unpackager) {
                 Write-Yellow "Fallback:"
                 Write-Green "  $($siteConfig.Unpackager)"
             }
         }
-    } catch {
+    }
+    catch {
         Write-Red "✗ Failed to run Node.js: $_"
     }
 
-} elseif ($PAGE_HTML -match 'assets/project\.json') {
+}
+elseif ($PAGE_HTML -match 'assets/project\.json') {
     # Type B: project downloaded at runtime
     Write-Blue "`n→ Detected downloadable project (project.json + assets)."
 
-    $ASSETS_BASE_URL  = & $siteConfig.AssetBaseUrl $projectId
+    $ASSETS_BASE_URL = & $siteConfig.AssetBaseUrl $projectId
     $PROJECT_JSON_URL = "$ASSETS_BASE_URL/project.json"
 
     Write-Blue "  Assets URL : $ASSETS_BASE_URL"
@@ -486,7 +504,8 @@ if ($PAGE_HTML -match '<script data=') {
 
     try {
         Invoke-WebRequest -Uri $PROJECT_JSON_URL -OutFile $JSON_FILE -UseBasicParsing -ErrorAction Stop
-    } catch {
+    }
+    catch {
         Write-Red "✗ Failed to download project.json: $_"
         exit 1
     }
@@ -541,24 +560,28 @@ if ($PAGE_HTML -match '<script data=') {
 
             $zip_size = "{0:N2} MB" -f ((Get-Item $OUTPUT_ZIP).Length / 1MB)
             Write-Green "✓ SB3 created: $OUTPUT_ZIP ($zip_size)"
-        } catch {
+        }
+        catch {
             Write-Red "✗ Failed to create sb3 file: $_"
-        } finally {
+        }
+        finally {
             Remove-Item $TEMP_ZIP_DIR -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 
-} elseif ($siteConfig.Method -eq "scratch_api") {
+}
+elseif ($siteConfig.Method -eq "scratch_api") {
     Write-Blue "`n→ Scratch API project detected."
 
-    $meta  = Invoke-RestMethod -Uri "https://api.scratch.mit.edu/projects/$projectId" -ErrorAction Stop
+    $meta = Invoke-RestMethod -Uri "https://api.scratch.mit.edu/projects/$projectId" -ErrorAction Stop
     $token = $meta.project_token
     $title = $meta.title -replace '[^a-zA-Z0-9_-]', '_'
 
     if ([string]::IsNullOrWhiteSpace($token)) {
         Write-Yellow "⚠ No token found - project may be unshared. Attempting direct download..."
         $projectJsonUrl = "https://projects.scratch.mit.edu/$projectId"
-    } else {
+    }
+    else {
         $projectJsonUrl = "https://projects.scratch.mit.edu/${projectId}?token=$token"
     }
 
@@ -570,7 +593,8 @@ if ($PAGE_HTML -match '<script data=') {
 
     try {
         Invoke-WebRequest -Uri $projectJsonUrl -OutFile $JSON_FILE -UseBasicParsing -ErrorAction Stop
-    } catch {
+    }
+    catch {
         Write-Red "✗ Failed to download project.json: $_"
         exit 1
     }
@@ -609,14 +633,17 @@ if ($PAGE_HTML -match '<script data=') {
             Compress-Archive -Path "$TEMP_ZIP_DIR\*" -DestinationPath $OUTPUT_ZIP -Force
             $zip_size = "{0:N2} MB" -f ((Get-Item $OUTPUT_ZIP).Length / 1MB)
             Write-Green "✓ SB3 created: $OUTPUT_ZIP ($zip_size)"
-        } catch {
+        }
+        catch {
             Write-Red "✗ Failed to create sb3 file: $_"
-        } finally {
+        }
+        finally {
             Remove-Item $TEMP_ZIP_DIR -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 
-} else {
+}
+else {
     Write-Red "✗ Could not determine project type from the page."
     Write-Yellow "  The page may use an unsupported packaging format."
     exit 1
