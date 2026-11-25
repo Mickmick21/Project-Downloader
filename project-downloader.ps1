@@ -1,4 +1,4 @@
-# --- Website Configuration ---
+﻿# --- Website Configuration ---
 
 # =============================================================================
 # WEBSITE CONFIGURATION
